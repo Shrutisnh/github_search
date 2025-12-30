@@ -1,17 +1,27 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 
-export default function CustomInputText({
+interface CustomInputTextProps {
+  label?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  onSubmitEditing?: () => void;
+  error?: string;
+}
+
+const CustomInputText: React.FC<CustomInputTextProps> = ({
   label,
   value,
   onChangeText,
   placeholder,
   onSubmitEditing,
   error,
-}) {
+}) => {
   return (
     <View style={styles.container}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
+
       <TextInput
         style={[styles.input, error ? styles.inputError : null]}
         value={value}
@@ -21,10 +31,14 @@ export default function CustomInputText({
         onSubmitEditing={onSubmitEditing}
         returnKeyType="search"
       />
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
-}
+};
+
+export default CustomInputText;
+
 
 const styles = StyleSheet.create({
   container: {
