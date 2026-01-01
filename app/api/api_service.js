@@ -8,52 +8,65 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const fetchRepositories = async (
   page,
   endPoint = "https://api.github.com/search/repositories",
-  text = ""
+  text = "",
+  order = "asc"
 ) => {
   const maxRetries = 5;
   let attempt = 0;
   let lastErr;
 
-  while (attempt <= maxRetries) {
+  while (attempt < maxRetries) {
     try {
-      const query = text ? text : 'nextjs';
-      const res = await axios.get(endPoint, {
+      const query = text || "nextjs";
+
+      const requestParams = {
         params: {
           q: query,
-          page: page,
+          page,
           per_page: 10,
+          sort: "stars",   // ✅ correct
+          order,           // ✅ correct
         },
         headers: {
           Accept: "application/vnd.github+json",
-          ...(GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {}),
+          ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
         },
+      };
+
+      console.log("request::", {
+        url: endPoint,
+        params: requestParams.params,
+        headers: requestParams.headers,
       });
-    //   console.log(`GitHub API response1:`+ JSON.stringify(res.data.items[0]));
+
+      const res = await axios.get(endPoint, requestParams);
+
+      console.log("response::", {
+        status: res.status,
+        firstRepo: res.data.items?.[0]?.full_name,
+      });
 
       return res.data.items || [];
     } catch (err) {
       lastErr = err;
       const status = err.response?.status;
       const headers = err.response?.headers || {};
-      const retryAfter = headers["retry-after"] ? parseInt(headers["retry-after"], 10) * 1000 : null;
 
       if (status === 422) {
-        console.warn('GitHub API 422 Unprocessable Entity:', err.response?.data);
-        throw new Error(`GitHub API 422: ${err.response?.data?.message || 'Invalid search query (q parameter). Provide a non-empty search term.'}`);
+        throw new Error(
+          err.response?.data?.message ||
+          "Invalid GitHub search query"
+        );
       }
 
-      if (status === 429 || status === 403) {
-        attempt += 1;
-        if (attempt > maxRetries) break;
+      if (status === 403 || status === 429) {
+        attempt++;
+        const retryAfter =
+          headers["retry-after"]
+            ? parseInt(headers["retry-after"], 10) * 1000
+            : Math.min(1000 * 2 ** attempt, 15000);
 
-        const backoff = retryAfter ?? Math.min(1000 * 2 ** attempt, 15000) + Math.floor(Math.random() * 1000);
-        console.warn(`GitHub rate limit (status ${status}). Retry ${attempt}/${maxRetries} in ${backoff}ms.`, {
-          "x-ratelimit-remaining": headers["x-ratelimit-remaining"],
-          "x-ratelimit-reset": headers["x-ratelimit-reset"],
-          "retry-after": headers["retry-after"],
-        });
-
-        await sleep(backoff);
+        await sleep(retryAfter);
         continue;
       }
 
@@ -61,9 +74,6 @@ export const fetchRepositories = async (
     }
   }
 
-  if (lastErr?.response?.status === 429 || lastErr?.response?.status === 403) {
-    throw new Error("GitHub rate limit reached. Consider adding an auth token or using a server-side cache/proxy.");
-  }
-
   throw lastErr;
 };
+

@@ -1,22 +1,23 @@
-import { useNavigation } from '@react-navigation/native';
 import { useRouter } from "expo-router";
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Button, FlatList, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
 import * as ApiService from '../api/api_service';
 import CustomInputText from '../components/CustomTextInput';
-
+import DynamicBottomSheet from '../components/DynamicBottomSheet';
 const PaginatedList = () => {
   const [data, setData] = useState([]);
   const [page, setPage] = useState(1);
   const [text,setText] = useState('');
+  const [order,setOrder] = useState('asc');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const sheetRef = useRef(null);
 
   const fetchData = async (searchText = text, pageToFetch = page) => {
     if (loading) return; // Prevent multiple simultaneous fetches
     setLoading(true);
     try {
-      const response = await ApiService.fetchRepositories(pageToFetch, 'https://api.github.com/search/repositories', searchText);
+      const response = await ApiService.fetchRepositories(pageToFetch, 'https://api.github.com/search/repositories', searchText, order);
       const newData = await response;
 
       // If fetching the first page for a new search, replace data; otherwise append
@@ -33,8 +34,6 @@ const PaginatedList = () => {
     fetchData(text); // Initial data fetch
   }, []);
 
-  const navigation = useNavigation();
-
   const renderItem = ({ item }) => (
     <View style={{ padding: 20, borderBottomWidth: 1, borderColor: '#ccc' }}>
       <TouchableOpacity
@@ -49,6 +48,7 @@ const PaginatedList = () => {
         }
         }>
         <Text style={{ fontSize: 16, color: "blue" }}>{item.name}</Text>
+        <Text style={{ fontSize: 14, color: "#555" }}>{item.owner.login}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -60,6 +60,7 @@ const PaginatedList = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }} edges={['top','left','right']}>
+      
       <CustomInputText
         placeholder="Search the topic"
         onChangeText={setText}
@@ -70,6 +71,35 @@ const PaginatedList = () => {
           fetchData(text, 1);
         }}
       />
+      <Button title="Sort by" onPress={() => sheetRef.current?.open()} />
+
+      <DynamicBottomSheet ref={sheetRef}>
+        <View style={{ padding: 20, color: '#fff' }}>
+        <Text style={{ fontSize: 18, marginBottom: 10,textAlign:'center' }}>
+          Sort by
+        </Text>
+        <TouchableOpacity style={{ paddingVertical: 10 }}onPress={async () => {
+          setOrder('asc');
+          await fetchData(text, 1);
+          sheetRef.current?.close();
+      }}>
+        <Text>
+          Ascending
+        </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ paddingVertical: 10 }} onPress={async () => {
+          setOrder('desc');
+          await fetchData(text, 1);
+          sheetRef.current?.close();
+      }}>
+        <Text>
+          Descending
+        </Text>
+        </TouchableOpacity>
+        </View>
+
+        
+      </DynamicBottomSheet>
 
       <FlatList
         data={data}
